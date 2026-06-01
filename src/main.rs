@@ -6,15 +6,13 @@ use std::{fs, str};
 use std::process::exit;
 use clap::Parser;
 use colour::{
-    blue, cyan, cyan_ln, green, green_ln, magenta, magenta_ln, red_ln, yellow, yellow_ln,
+    blue, blue_ln, cyan, cyan_ln, green, green_ln, magenta, magenta_ln, red_ln, yellow, yellow_ln,
 };
 
-use crate::balamod::{get_save_dir, Balatro};
-use crate::dependencies::balamod_version_exists;
-
-mod balamod;
+mod zip;
 mod dependencies;
-mod finder;
+
+type Error = Box<dyn std::error::Error>;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -48,73 +46,63 @@ struct StepDuration {
     name: String,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>>{
     let args = Args::parse();
-
     let mut durations: Vec<StepDuration> = Vec::new();
 
     if args.inject && args.auto {
         red_ln!("You can't use -x and -a at the same time!");
-        return;
+        return Ok(());
     }
 
     if args.inject && args.decompile {
         red_ln!("You can't use -x and -d at the same time!");
-        return;
+        return Ok(());
     }
 
     if args.auto && args.decompile {
         red_ln!("You can't use -a and -d at the same time!");
-        return;
+        return Ok(());
     }
 
-    let balatros = balamod::find_balatros();
+    let balatros = zip::get_balatro_paths();
+    blue_ln!("Found {} Balatro installations.", balatros.len());
 
-    let balatro: Balatro;
+    let balatro_path: PathBuf;
     if let Some(ref path) = args.balatro_path {
-        balatro = Balatro {
-            path: std::path::PathBuf::from(path),
-        };
+        balatro_path = PathBuf::from(path);
     } else {
         if balatros.len() == 0 {
             red_ln!("No Balatro found!");
             println!("Please specify the path to your Balatro installation with the -b option");
-            return;
+            return Ok(());
         } else if balatros.len() == 1 {
-            balatro = balatros[0].clone();
+            balatro_path = balatros[0].clone();
             green!("Balatro ");
-            yellow!("v{}", balatro.get_version().unwrap());
-            green_ln!(" found !")
+            yellow!("v{}", zip::get_version(&balatro_path)?);
+            green_ln!(" found!")
         } else {
             println!("Multiple Balatro found");
-            for (i, balatro) in balatros.iter().enumerate() {
+            for (i, balatro_path) in balatros.iter().enumerate() {
                 green!("[");
                 yellow!("{}", i + 1);
                 green!("] ");
                 magenta!("Balatro ");
-                cyan!("v{} ", balatro.get_version().unwrap());
+                cyan!("v{} ", zip::get_version(&balatro_path)?);
                 magenta!("in ");
-                cyan_ln!("{}", balatro.path.display());
+                cyan_ln!("{}", balatro_path.display());
             }
 
             blue!("Please choose a Balatro: ");
             let mut input = String::new();
-            std::io::stdin()
-                .read_line(&mut input)
-                .expect("Error while reading input");
+            std::io::stdin().read_line(&mut input)?;
             let input = input.trim();
-            let input: usize = match input.parse() {
-                Ok(input) => input,
-                Err(_) => {
-                    red_ln!("Invalid input!");
-                    return;
-                }
-            };
+            let input: usize = input.parse()?;
             if input > balatros.len() || input == 0 {
                 red_ln!("Invalid input!");
-                return;
+                return Ok(());
             }
-            balatro = balatros[input - 1].clone();
+            balatro_path = balatros[input - 1].clone();
         }
     }
 
@@ -125,11 +113,11 @@ fn main() {
     }
 
     if args.inject {
-        inject(args.clone(), balatro.clone(), &mut durations);
+        inject(args.clone(), &balatro_path, &mut durations);
     }
 
     if args.decompile {
-        decompile_game(balatro.clone(), args.output, &mut durations);
+        decompile_game(&balatro_path, args.output, &mut durations);
     }
 
     if args.auto {
@@ -148,12 +136,13 @@ fn main() {
     for duration in durations {
         magenta_ln!("{}: {:?}", duration.name, duration.duration);
     }
+    return Ok(());
 }
 
 fn install(version: Option<String>, durations: &mut Vec<StepDuration>, linux_native: bool) {
     if let Some(version) = version.clone() {
         magenta_ln!("Installing Balamod v{}", version);
-        if !balamod_version_exists(&version, linux_native) {
+        if !dependencies::balamod_version_exists(&version, linux_native) {
             red_ln!("Version {} does not exist!", version);
             exit(1);
         }
@@ -161,7 +150,8 @@ fn install(version: Option<String>, durations: &mut Vec<StepDuration>, linux_nat
         magenta_ln!("Installing latest Balamod");
     }
 
-    let save_dir = get_save_dir(linux_native);
+    let save_dir = zip::get_save_dir(linux_native);
+    if !save_dir.exists() { panic!("OS Unsupported!") }
     if fs::metadata(save_dir.join("main.lua").as_path()).is_ok() {
         yellow_ln!("main.lua already exists, skipping modloader installation...");
         yellow_ln!("To reinstall the modloader, please uninstall it first with -u");
@@ -253,7 +243,8 @@ fn install(version: Option<String>, durations: &mut Vec<StepDuration>, linux_nat
 fn uninstall(durations: &mut Vec<StepDuration>, linux_native: bool) {
     cyan_ln!("Removing modloader...");
     let start = Instant::now();
-    let save_dir = get_save_dir(linux_native);
+    let save_dir = zip::get_save_dir(linux_native);
+    if !save_dir.exists() { panic!("OS Unsupported!") }
     // delete main.lua
     let main_lua_path = save_dir.join("main.lua");
     if fs::metadata(main_lua_path.as_path()).is_ok() {
@@ -287,7 +278,7 @@ fn uninstall(durations: &mut Vec<StepDuration>, linux_native: bool) {
     green_ln!("Done!");
 }
 
-fn inject(mut args: Args, balatro: Balatro, durations: &mut Vec<StepDuration>) {
+fn inject(mut args: Args, path: &std::path::Path, durations: &mut Vec<StepDuration>) {
     if args.input.clone().is_none() {
         args.input = Some("Balatro.lua".to_string());
     }
@@ -320,12 +311,10 @@ fn inject(mut args: Args, balatro: Balatro, durations: &mut Vec<StepDuration>) {
 
         cyan_ln!("Compressing {} ...", args.input.clone().unwrap());
         let compress_start: Instant = Instant::now();
-        balatro
-            .compress_file(
-                args.input.clone().unwrap().as_str(),
-                compression_output.as_str(),
-            )
-            .expect("Error while compressing file");
+        zip::compress_file(
+            args.input.clone().unwrap().as_str(),
+            compression_output.as_str(),
+        ).expect("Error while compressing file");
 
         durations.push(StepDuration {
             duration: compress_start.elapsed(),
@@ -345,8 +334,7 @@ fn inject(mut args: Args, balatro: Balatro, durations: &mut Vec<StepDuration>) {
     cyan_ln!("Injecting...");
     let inject_start = Instant::now();
 
-    balatro
-        .replace_file(args.output.clone().unwrap().as_str(), input_bytes)
+    zip::replace_file(path, args.output.clone().unwrap().as_str(), input_bytes)
         .expect("Error while replacing file");
 
     durations.push(StepDuration {
@@ -363,7 +351,7 @@ fn inject(mut args: Args, balatro: Balatro, durations: &mut Vec<StepDuration>) {
 }
 
 fn decompile_game(
-    balatro: Balatro,
+    game_path: &std::path::Path,
     output_folder: Option<String>,
     durations: &mut Vec<StepDuration>,
 ) {
@@ -380,13 +368,12 @@ fn decompile_game(
 
     cyan_ln!("Decompiling...");
     let decompile_start = Instant::now();
-    let paths = balatro.get_all_files().unwrap();
+    let paths = zip::get_all_files(game_path).unwrap();
     for path in paths {
         if path.ends_with("/") {
             continue;
         }
-        let file_bytes = balatro
-            .get_file_data(path.as_str())
+        let file_bytes = zip::get_file_data(game_path, path.as_str())
             .expect("Error while reading file");
 
         let normalized_path = path.replace("\\", "/");
@@ -407,7 +394,7 @@ fn decompile_game(
             Ok(mut file) => {
                 file.write_all(&file_bytes)
                     .expect("Error while writing to file");
-            }
+                }
             Err(e) => {
                 println!("Error while creating file: {:?}", e);
                 println!("Failed path: {:?}", full_path);
