@@ -1,3 +1,5 @@
+use async_compat::CompatExt;
+use textfmt::*;
 use crate::Error;
 
 #[cfg(target_os = "macos")]
@@ -20,24 +22,24 @@ const BALAMOD_LUA_RELEASES: &'static str = "https://github.com/balamod/balamod_l
 const BALAMOD_LUA_LATEST: &'static str = "https://github.com/balamod/balamod_lua/releases/latest/download/";
 const BALALIB_RELEASES: &'static str = "https://github.com/balamod/balalib/releases/download/";
 const BALALIB_LATEST: &'static str = "https://github.com/balamod/balalib/releases/latest/download/";
-const MAIN_PATCH: &'static str = "https://raw.githubusercontent.com/balamod/balamod_lua/main/main.patch.lua";
+pub const MAIN_PATCH: &'static str = "https://raw.githubusercontent.com/balamod/balamod_lua/main/main.patch.lua";
 
 #[cfg(target_os = "linux")]
-fn get_tar_file_name(linux_native: bool) -> &'static str { if linux_native { TAR_FILE } else { TAR_FILE_PROTON } }
+pub fn get_tar_file_name(linux_native: bool) -> &'static str { if linux_native { TAR_FILE } else { TAR_FILE_PROTON } }
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn get_tar_file_name(linux_native: bool) -> &'static str { TAR_FILE }
+pub fn get_tar_file_name(linux_native: bool) -> &'static str { TAR_FILE }
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-fn get_tar_file_name(linux_native: bool) -> &'static str { panic!("Unsupported OS") }
+pub fn get_tar_file_name(linux_native: bool) -> &'static str { panic!("Unsupported OS") }
 
-fn try_download_to_vec(url: &str) -> Result<Vec<u8>, Error> {
-    Ok(reqwest::blocking::get(url)?.bytes()?.to_vec())
-}
+pub async fn finish_download
+    <T: Future<Output = Result<reqwest::Response, reqwest::Error>>>
+    (ft: T) 
+    -> Result<Vec<u8>, Error> { Ok(ft.await?.bytes().await?.to_vec()) }
 
-#[inline]
-pub fn download_tar(tag: Option<String>, linux_native: bool) -> Result<Vec<u8>, Error> {
+pub fn get_tar_url(tag: Option<&str>, linux_native: bool) -> String {
     match tag {
-        Some(tag) => try_download_to_vec(&(BALAMOD_LUA_RELEASES.to_string() + &tag + &get_tar_file_name(linux_native))),
-        None => try_download_to_vec(&(BALAMOD_LUA_LATEST.to_string() + &get_tar_file_name(linux_native))),
+        Some(tag) => BALAMOD_LUA_RELEASES.to_string() + &tag + "/" + &get_tar_file_name(linux_native),
+        None => BALAMOD_LUA_LATEST.to_string() + &get_tar_file_name(linux_native),
     }
 }
 
@@ -47,30 +49,94 @@ pub fn get_balalib_name(linux_native: bool) -> &'static str {
     else { LIB_FILE }
 }
 
-#[inline]
-pub fn download_balalib(tag: Option<String>, linux_native: bool) -> Result<Vec<u8>, Error> {
+pub fn get_balalib_url(tag: Option<&str>, linux_native: bool) -> String {
     match tag {
-        Some(tag) => try_download_to_vec(&(BALALIB_RELEASES.to_string() + &tag + &get_tar_file_name(linux_native))),
-        None => try_download_to_vec(&(BALALIB_LATEST.to_string() + &get_tar_file_name(linux_native))),
+        Some(tag) => BALALIB_RELEASES.to_string() + &tag + "/" + &get_tar_file_name(linux_native),
+        None => BALALIB_LATEST.to_string() + &get_tar_file_name(linux_native),
     }
 }
 
-pub fn unpack_tar(dir: &str, tar: Vec<u8>, linux_native: bool) -> Result<(), Error> {
-    tar::Archive::new(flate2::read::GzDecoder::new(std::io::Cursor::new(tar)))
-        .unpack(dir)?;
-    let dir_path = std::path::PathBuf::from(dir);
-    std::fs::rename(
-        dir_path.join(get_tar_file_name(linux_native).split('.').next().unwrap()), 
-        dir_path.join("balamod"))?; // rename dir to balamod
-    Ok(())
-}
+pub fn download_file(url: &str) 
+    -> async_compat::Compat<impl Future<Output = Result<reqwest::Response, reqwest::Error>>>  
+{ reqwest::get(url).compat() }
 
-#[inline]
-pub fn download_patched_main() -> Result<Vec<u8>, Error> { try_download_to_vec(MAIN_PATCH) }
-
-pub fn balamod_version_exists(ver: &str, linux_native: bool) -> bool {
-    reqwest::blocking::get(&(BALAMOD_LUA_RELEASES.to_string() + ver + &get_tar_file_name(linux_native)))
+pub async fn balamod_version_exists(ver: &str, linux_native: bool) -> bool {
+    reqwest::get(&(BALAMOD_LUA_RELEASES.to_string() + ver + &get_tar_file_name(linux_native)))
+        .compat()
+        .await
         .unwrap()
         .status()
         .as_u16() != 404
+}
+
+pub fn get_balatro_path<'a>(
+    balatro_path: &'a Option<&str>, 
+    balatros: &'a Vec<std::path::PathBuf>,
+) 
+    -> Result<&'a std::path::Path, Error> 
+{
+    match balatro_path {
+        Some(path) => Ok(std::path::Path::new(path)),
+        None => {
+            if balatros.len() == 0 {
+                Err(no_balatro_found())
+            } else if balatros.len() == 1 {
+                one_balatro_found(&balatros)
+            } else {
+                multiple_balatros_found(&balatros)
+            }
+        },
+    }
+}
+
+fn no_balatro_found() -> Error {
+    "No Balatro found!"
+        .bright_red()
+        .underline()
+        .eprintln();
+    "Please specify the path to your Balatro installation with the -b option"
+        .bright_white()
+        .eprintln();
+    "Balatro not found".into()
+}
+
+fn one_balatro_found<'a>(balatros: &'a Vec<std::path::PathBuf>) 
+    -> Result<&'a std::path::Path, Error> 
+{
+    "Balatro "
+        .green()
+        .print();
+    ("v".to_string() + &crate::archive::zip_utils::get_version(&balatros[0])?)
+        .yellow()
+        .print();
+    " found!"
+        .green()
+        .println();
+    Ok(balatros[0].as_path())
+}
+
+fn multiple_balatros_found<'a>(balatros: &'a Vec<std::path::PathBuf>)
+    -> Result<&'a std::path::Path, Error>
+{
+    println!("Multiple Balatro found");
+    for (i, balatro_path) in balatros.iter().enumerate() {
+        "[".green().print();
+        (i + 1).to_string().yellow().print();
+        "] ".green().print();
+        "Balatro ".magenta().print();
+        ("v".to_string() + &crate::archive::zip_utils::get_version(&balatro_path).unwrap()).cyan().italic().print();
+        "in ".magenta().print();
+        balatro_path.display().to_string().cyan().italic().println();
+    }
+
+    "Please choose a Balatro version: ".blue().print();
+    let mut buf = String::new();
+    std::io::stdin().read_line(&mut buf)?;
+    let input: usize = buf.trim().parse()?;
+    if input > balatros.len() || input == 0 {
+        "Invalid input!".bg_red().bright_white().underline().eprintln();
+        return Err("Invalid input".into());
+    }
+    Ok(balatros[input - 1].as_path())
+
 }
