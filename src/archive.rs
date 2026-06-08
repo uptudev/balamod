@@ -33,14 +33,13 @@ pub mod zip_utils {
 
         writer.start_file(
             file_name, 
-            zip::write::FileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored))?;
-            writer.write_all(new_contents)?;
-            writer.finish()?;
-            drop(writer);
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored))?;
+        writer.write_all(new_contents)?;
+        writer.finish()?;
 
-            std::fs::write(exe_path, buffer)?;
-            Ok(())
+        std::fs::write(exe_path, buffer)?;
+        Ok(())
     }
 
     pub fn extract_all(game_path: &Path, output_path: &Path) -> Result<(), Error> {
