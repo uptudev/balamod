@@ -13,7 +13,7 @@ const BIN_NAME: &'static str = env!("CARGO_BIN_NAME");
 fn print_help_info() {
     let balatro = "Balatro".cyan().italic();
     println!("{} is a {}, {}, and {} for {balatro} that supports in-game code injection.",
-        BIN_NAME.magenta().italic(),
+        BIN_NAME.red().italic(),
         "mod loader".blue(),
         "injector".blue(),
         "decompiler".blue());
@@ -22,42 +22,42 @@ fn print_help_info() {
     println!("    {} {} {}", 
         BIN_NAME.yellow(), 
         "a".blue(), 
-        "[OPTIONS]".magenta());
+        "[OPTIONS]".red());
     println!("        Auto-injects the modloader into your {balatro} install.");
     println!("    {} {} {} {} {} {} {}", 
         BIN_NAME.yellow(), 
         "x".blue(), 
-        "-i/--input".magenta(), 
+        "-i/--input".red(), 
         "<FILE>".green(),
-        "-o/--output".magenta(), 
+        "-o/--output".red(), 
         "<FILE>".green(),
-        "[OPTIONS]".magenta());
+        "[OPTIONS]".red());
     println!("        Injects a specific {} file into your {balatro} install.", 
-        "input".magenta());
+        "input".red());
     println!("        The file is injected into the game at the relative {} location.",
-        "output".magenta());
+        "output".red());
     println!("    {} {} {}",
         BIN_NAME.yellow(),
         "d".blue(),
-        "[OPTIONS]".magenta());
+        "[OPTIONS]".red());
     println!("        Decompile/extract the {balatro} game files, optionally to a given {} location.",
-        "output".magenta());
+        "output".red());
     println!();
     println!("{}{}", "Options".yellow(), ":");
-    println!("    {}", "--help".magenta());
+    println!("    {}", "--help".red());
     println!("        Display this message.");
-    println!("    {}", "--version".magenta());
-    println!("        Display the {} version.", BIN_NAME.magenta().italic());
-    println!("    {}, {} {}", "-i".magenta(), "--input".magenta(), "<FILE>".green());
-    println!("        Specify an {} file to inject into {balatro}.", "input".magenta());
-    println!("    {}, {} {}", "-o".magenta(), "--output".magenta(), "<FILE>".green());
+    println!("    {}", "--version".red());
+    println!("        Display the {} version.", BIN_NAME.red().italic());
+    println!("    {}, {} {}", "-i".red(), "--input".red(), "<FILE>".green());
+    println!("        Specify an {} file to inject into {balatro}.", "input".red());
+    println!("    {}, {} {}", "-o".red(), "--output".red(), "<FILE>".green());
     println!("        Specify where to decompile {balatro} files to, or");
     println!("        where to place files within {balatro} when injecting them.");
-    println!("    {}, {} {}", "-b".magenta(), "--balatro-path".magenta(), "<PATH>".green());
+    println!("    {}, {} {}", "-b".red(), "--balatro-path".red(), "<PATH>".green());
     println!("        Specify a path to look for {balatro} installations.");
-    println!("    {}, {} {}", "-v".magenta(), "--balatro-version".magenta(), "<VERSION>".green());
+    println!("    {}, {} {}", "-v".red(), "--balatro-version".red(), "<VERSION>".green());
     println!("        Specify a particular {balatro} version to modify.");
-    println!("    {}", "--linux-native".magenta());
+    println!("    {}", "--linux-native".red());
     println!("        Specify that {balatro} is running natively on Linux {}.",
         "(not through Proton)".italic().faint());
 }
@@ -142,11 +142,11 @@ fn main() -> Result<(), Error> {
     if args.auto { install(&save_dir, args.balatro_version, &mut durations, args.linux_native)?; }
 
     format!("Total time: {:?}", global_start.elapsed())
-        .magenta()
+        .red()
         .println();
     for duration in durations.inner() {
         format!("{}: {:?}", duration.name, duration.duration)
-            .magenta()
+            .red()
             .println();
     }
     return Ok(());
