@@ -81,6 +81,10 @@ fn main() -> Result<(), Error> {
     let args = parser::parse_args(parser::split_args(&arg_vec));
     let mut durations: Timers = Timers::init();
 
+    if cfg!(target_os = "windows") {
+        enable_ansi_support::enable_ansi_support()?;
+    }
+
     if args.help { return Ok(print_help_info()) }
     if args.version { return Ok(println!("balamod v{}", VERSION)) }
 

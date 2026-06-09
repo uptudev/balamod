@@ -1,7 +1,5 @@
 use textfmt::*;
 use std::path::{Path, PathBuf};
-#[cfg(target_os = "windows")]
-use winreg::{enums::*, RegKey};
 
 #[cfg(target_os = "macos")]
 const STEAM_LOCATION: [&'static str; 3] = ["Library", "Application Support", "Steam"];
@@ -15,7 +13,7 @@ pub fn get_balatro_paths() -> Vec<PathBuf> {
         .open_subkey("SOFTWARE\\WOW6432Node\\Valve\\Steam")
         .map(|k| k.get_value("InstallPath"))
         .flatten()
-        .map(|str| Path::new(&str))
+        .map(|str: String| PathBuf::from(&str))
         .unwrap_or_else(|_| {
             "Could not read steam install path from Registry! Trying standard installation path in `Program Files (x86)`"
                 .red()
@@ -23,13 +21,12 @@ pub fn get_balatro_paths() -> Vec<PathBuf> {
                 .println();
             return std::env::var("ProgramFiles(x86)")
                 .map(|str| 
-                    Path::new(&str)
-                        .join("Steam")
-                        .as_path())
-                .unwrap_or(Path::new(""));
+                    PathBuf::from(&str)
+                        .join("Steam"))
+                .unwrap_or(PathBuf::new());
         });
     if path.exists() {
-        return get_library_folders(path);
+        return get_library_folders(&path);
     } else {
         "Could not find Steam folder!"
             .red()

@@ -16,7 +16,6 @@ const LIB_FILE: &'static str = "balalib.dylib";
 const LIB_FILE: &'static str = "balalib.dll";
 #[cfg(target_os = "linux")]
 const LIB_FILE: &'static str = "balalib.so";
-#[cfg(target_os = "linux")]
 const LIB_FILE_PROTON: &'static str = "balalib.dll";
 const BALAMOD_LUA_RELEASES: &'static str = "https://github.com/balamod/balamod_lua/releases/download/";
 const BALAMOD_LUA_LATEST: &'static str = "https://github.com/balamod/balamod_lua/releases/latest/download/";
@@ -27,9 +26,9 @@ pub const MAIN_PATCH: &'static str = "https://raw.githubusercontent.com/balamod/
 #[cfg(target_os = "linux")]
 pub fn get_tar_file_name(linux_native: bool) -> &'static str { if linux_native { TAR_FILE } else { TAR_FILE_PROTON } }
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-pub fn get_tar_file_name(linux_native: bool) -> &'static str { TAR_FILE }
+pub fn get_tar_file_name(_linux_native: bool) -> &'static str { TAR_FILE }
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-pub fn get_tar_file_name(linux_native: bool) -> &'static str { panic!("Unsupported OS") }
+pub fn get_tar_file_name(_linux_native: bool) -> &'static str { panic!("Unsupported OS") }
 
 pub async fn finish_download
     <T: Future<Output = Result<reqwest::Response, reqwest::Error>>>
@@ -43,11 +42,14 @@ pub fn get_tar_url(tag: Option<&str>, linux_native: bool) -> String {
     }
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+pub fn get_balalib_name(linux_native: bool) -> &'static str { panic!("Unsupported OS") }
+#[cfg(target_os = "linux")]
 pub fn get_balalib_name(linux_native: bool) -> &'static str {
-    if !cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux")) { panic!("Unsupported OS") }
-    else if cfg!(target_os = "linux") && !linux_native { LIB_FILE_PROTON }
-    else { LIB_FILE }
+    if linux_native { LIB_FILE } else { LIB_FILE_PROTON }
 }
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub fn get_balalib_name(linux_native: bool) -> &'static str { LIB_FILE }
 
 pub fn get_balalib_url(tag: Option<&str>, linux_native: bool) -> String {
     match tag {
