@@ -6,7 +6,6 @@ const STEAM_LOCATION: [&'static str; 3] = ["Library", "Application Support", "St
 #[cfg(target_os = "linux")]
 const STEAM_LOCATION: [&'static str; 3] = [".local", "share", "Steam"];
 
-#[inline]
 #[cfg(target_os = "windows")]
 pub fn get_balatro_paths() -> Vec<PathBuf> {
     let path = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE)
@@ -37,7 +36,6 @@ pub fn get_balatro_paths() -> Vec<PathBuf> {
     }
 }
 
-#[inline]
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn get_balatro_paths() -> Vec<PathBuf> {
     std::env::var("HOME")
@@ -75,7 +73,6 @@ fn get_library_folders(steam_path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-#[inline]
 #[cfg(target_os = "macos")]
 pub fn get_save_dir(_linux_native: bool) -> PathBuf { 
     PathBuf::from("Users")
@@ -85,14 +82,12 @@ pub fn get_save_dir(_linux_native: bool) -> PathBuf {
         .join("Balatro")
 }
 
-#[inline]
 #[cfg(target_os = "windows")]
 pub fn get_save_dir(_linux_native: bool) -> PathBuf { 
     PathBuf::from(std::env::var("APPDATA").unwrap())
         .join("Balatro")
 }
 
-#[inline]
 #[cfg(target_os = "linux")]
 pub fn get_save_dir(linux_native: bool) -> PathBuf { 
     if linux_native {
@@ -119,7 +114,6 @@ pub fn get_save_dir(linux_native: bool) -> PathBuf {
     }
 }
 
-#[inline]
 #[cfg(target_os = "macos")]
 pub fn get_exe_path(path: &Path) -> PathBuf { 
     let mut path = path.join("Balatro.app");
@@ -129,6 +123,5 @@ pub fn get_exe_path(path: &Path) -> PathBuf {
     return path;
 }
 
-#[inline]
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn get_exe_path(path: &Path) -> PathBuf { path.join("Balatro.exe") }

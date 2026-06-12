@@ -80,11 +80,7 @@ fn main() -> Result<(), Error> {
         .collect();
     let args = parser::parse_args(parser::split_args(&arg_vec));
     let mut durations: Timers = Timers::init();
-
-    if cfg!(target_os = "windows") {
-        enable_ansi_support::enable_ansi_support()?;
-    }
-
+    if cfg!(target_os = "windows") { enable_ansi_support::enable_ansi_support()?; }
     if args.help { return Ok(print_help_info()) }
     if args.version { return Ok(println!("balamod v{}", VERSION)) }
 
@@ -264,11 +260,6 @@ fn uninstall(save_dir: &std::path::Path, durations: &mut Timers, linux_native: b
 fn remove_file_if_exists(path: &std::path::Path) { if path.exists() { std::fs::remove_file(path).unwrap() } }
 fn remove_dir_if_exists(path: &std::path::Path) { if path.exists() { std::fs::remove_dir_all(path).unwrap() } }
 
-#[inline]
-fn strip_suffix_if_exists<'a>(str: &'a str, suff: &'a str) -> &'a str {
-    str.strip_prefix(suff).unwrap_or(str)
-}
-
 fn inject(mut args: parser::Args, path: &std::path::Path, durations: &mut Timers) 
     -> Result<(), Error> 
 {
@@ -337,6 +328,7 @@ fn inject(mut args: parser::Args, path: &std::path::Path, durations: &mut Timers
     }
     return Ok(());
 }
+fn strip_suffix_if_exists<'a>(str: &'a str, suff: &'a str) -> &'a str { str.strip_prefix(suff).unwrap_or(str) }
 
 fn extract_game_files(
     game_path: &std::path::Path,

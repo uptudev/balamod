@@ -68,7 +68,6 @@ pub mod zip_utils {
             .to_string())
     }
 
-    #[inline]
     pub fn compress_file(input_path: &Path, output_path: &Path) -> Result<(), Error> {
         let mut buf = Vec::<u8>::with_capacity(4096);
         flate2::read::DeflateEncoder::new(
